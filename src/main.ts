@@ -13,7 +13,11 @@ import {
 } from "./resources/directory";
 import { ResourceClient } from "./resources/client";
 import { PAGE_SIZE } from "./resources/session";
-import { animationFrame, animationInterval } from "./resources/animation";
+import {
+  animationEvent,
+  animationFrame,
+  animationInterval,
+} from "./resources/animation";
 import type { Decoded, Entry, Kind } from "./resources/protocol";
 import type { Anime, AnimeAction } from "../.generated/xglib/contract";
 import { Preview, type PreviewFrame } from "./viewer/preview";
@@ -24,7 +28,7 @@ document.querySelector<HTMLDivElement>("#app")!.innerHTML = `
 <main id="welcome" class="welcome"><span class="eyebrow">YOUR LOCAL RESOURCE LIBRARY</span><h2>每一張圖像，<br>每一格動作。</h2><p>開啟你的遊戲資料夾，在瀏覽器中探索 Graphic 與 Anime。<br>從靜態像素到完整動畫，讓資源細節一目瞭然。</p><section class="connect-card"><div><h3>連接本機遊戲資源</h3><p>請選擇包含 <code>Assets</code> 的遊戲根目錄。<br>檔案僅供唯讀檢視，不會上傳或修改。</p><div class="button-row"><button id="pick" class="primary">選擇遊戲資料夾 ↗</button><button id="fallback">相容模式選取資料夾</button><button id="resume" hidden></button></div></div><div class="folder-icon" aria-hidden="true">▦</div></section><section class="features"><div><span class="eyebrow">01 / GRAPHIC</span><h3>看見像素細節</h3><p>搜尋圖像 ID、切換資源檔與調色盤，檢視尺寸、偏移和索引。</p></div><div><span class="eyebrow">02 / ANIME</span><h3>拆解每一格動作</h3><p>選擇動作與方向，播放、暫停或逐格檢查圖像與原始欄位。</p></div><div><span class="eyebrow">03 / LOCAL FIRST</span><h3>資源留在你的電腦</h3><p>使用 xglib WASM 在瀏覽器內解析，不需要帳號或後端服務。</p></div></section><p class="note">非官方研究工具，未由 Square Enix 授權或背書。遊戲名稱及商標屬各權利人。<br>請使用你有權使用的本機資料；本工具不提供遊戲素材。</p></main>
 <main id="workspace" class="workspace" hidden><aside class="sidebar"><div class="list-heading"><span class="section-label">RESOURCE LIBRARY</span><small id="root-name"></small></div><div class="source-fields"><label>Graphic 資源檔<select id="graphic-source"></select></label><label>Anime 資源檔<select id="anime-source"></select></label><label>調色盤<select id="palette"></select></label><label>動畫隱藏調色盤<select id="palette-source"></select></label></div><button id="reload" hidden>重新載入資源</button><div class="tabs" role="tablist" aria-label="資源類型"><button id="graphic-tab" role="tab" aria-selected="true">Graphic</button><button id="anime-tab" role="tab" aria-selected="false">Anime</button></div><input id="search" class="search" type="search" placeholder="搜尋 ID 或 #索引列…" aria-label="搜尋資源 ID 或索引列"><div class="list-heading"><span class="section-label">索引列表</span><small id="count">—</small></div><div id="entries" class="resource-list" aria-label="資源列表"></div><div class="pager"><button id="prev" aria-label="上一頁">←</button><span id="page">—</span><button id="next" aria-label="下一頁">→</button></div></aside>
 <section class="stage-area"><div class="stage-toolbar"><div class="stage-title"><span id="kind" class="tag">GRAPHIC</span><h2 id="selected-title">選擇一筆資源</h2></div><div class="tools"><button id="background" aria-label="切換預覽背景">◐</button><button id="zoom" title="回到 100%">100%</button><button id="fit">適合視窗</button></div></div><div class="canvas-wrap"><div id="canvas"></div><span class="canvas-caption">PIXEL PREVIEW / READ ONLY</span><div id="empty" class="empty-preview">從左側選擇資源以開始預覽</div></div><div id="playback" class="playback" hidden><input id="timeline" type="range" min="0" max="0" value="0" aria-label="動畫影格"><div class="button-row"><button id="back-frame" aria-label="上一格">◀</button><button id="play">播放</button><button id="next-frame" aria-label="下一格">▶</button><span id="frame-info"></span></div></div><div class="stage-foot"><span>拖曳平移 · 滾輪縮放 · 0 適合視窗</span><span>NEAREST PIXEL</span></div></section>
-<aside class="inspector"><span class="section-label">INSPECTOR</span><h2>資源資訊</h2><dl id="metadata"><dt>狀態</dt><dd>尚未選取</dd></dl><div id="animation-controls" class="controls" hidden><label>動作 / 方向<select id="action"></select></label><label>播放時序<select id="timing"><option value="duration">xgtool 時序（10 ms 精度）</option><option value="fps">固定 10 FPS</option></select></label><label>速度<select id="speed"><option value="0.5">0.5×</option><option value="1" selected>1×</option><option value="2">2×</option></select></label><p class="note">依 xgtool GIF 使用共同原點，忽略兩種偏移。flag、reversed 保留原始值，不套用效果。</p></div><p id="source-note"></p><p id="warnings" class="warnings"></p></aside></main>
+<aside class="inspector"><span class="section-label">INSPECTOR</span><h2>資源資訊</h2><dl id="metadata"><dt>狀態</dt><dd>尚未選取</dd></dl><div id="animation-controls" class="controls" hidden><label>動作 / 方向<select id="action"></select></label><label>播放時序<select id="timing"><option value="duration">CGTool 時序（毫秒）</option><option value="fps">固定 10 FPS</option></select></label><label>速度<select id="speed"><option value="0.5">0.5×</option><option value="1" selected>1×</option><option value="2">2×</option></select></label><p class="note">依 Graphic 偏移定位，套用水平／垂直鏡射。Frame 偏移保留供檢視；事件只顯示，不播放音效。</p></div><p id="source-note"></p><p id="warnings" class="warnings"></p></aside></main>
 <footer class="statusbar"><span id="status" role="status">等待選擇遊戲資料夾</span><span>xglib WASM · PixiJS</span></footer><input id="directory-input" type="file" webkitdirectory multiple hidden>
 `;
 const el = <T extends HTMLElement = HTMLElement>(id: string) =>
@@ -59,7 +63,7 @@ let selected: Entry | undefined,
   anime: Anime | undefined,
   frames: PreviewFrame[] = [];
 let ready = false;
-let animePaletteNote = "";
+
 const preview = new Preview();
 let previewReady: Promise<void> | undefined;
 const header = (action: AnimeAction) =>
@@ -85,7 +89,7 @@ function resetPreview() {
   preview.clear();
   frames = [];
   anime = undefined;
-  animePaletteNote = "";
+
   selected = undefined;
   el("playback").hidden = true;
   el("animation-controls").hidden = true;
@@ -244,7 +248,7 @@ async function openEntry(entry: Entry) {
       busy();
     } else if (result.kind === "anime") {
       anime = result.value;
-      animePaletteNote = result.paletteNote;
+
       el("animation-controls").hidden = false;
       options(
         "action",
@@ -295,7 +299,7 @@ async function openAction() {
       throw new Error("此動作超過 512 張獨立圖像的預覽上限。");
     const images = new Map<number, Decoded>(),
       failures = new Map<number, string>(),
-      notes = new Set<string>([animePaletteNote]);
+      notes = new Set<string>();
     let bytes = 0;
     for (const id of ids) {
       if (job !== selection || active !== client) return;
@@ -307,12 +311,13 @@ async function openAction() {
           throw new Error(`目前 Graphic 資源缺少 ID ${id}`);
         if (refs.rows.length > 1)
           notes.add(
-            `ID ${id} 有 ${refs.rows.length} 筆；暫用首列 #${refs.rows[0]}，可在 Graphic 分頁逐筆檢視。`,
+            `ID ${id} 有 ${refs.rows.length} 筆；依 CGTool 使用末列 #${refs.rows.slice(-1)[0]}，可在 Graphic 分頁逐筆檢視。`,
           );
         const result = await active.request({
           kind: "graphic",
-          row: refs.rows[0],
+          row: refs.rows.slice(-1)[0]!,
           animeRow: selected!.row,
+          animeAction: Number(select("action").value),
         });
         if (job !== selection || active !== client) return;
         if (result.kind === "graphic") {
@@ -333,14 +338,11 @@ async function openAction() {
       animationFrame(
         images.get(frame.graphic_id),
         failures.get(frame.graphic_id),
+        "Extended" in action.header ? action.header.Extended.reversed : 0,
       ),
     );
-    if (
-      Math.trunc(
-        header(action).duration / Math.max(1, action.frames.length) / 10,
-      ) <= 0
-    )
-      notes.add("GIF 延遲截整後為零或負值，預覽暫以 10 FPS 播放。");
+    if (header(action).duration <= 0)
+      notes.add("週期為零或負值，預覽暫以 10 FPS 播放。");
     for (const [id, message] of failures) notes.add(`圖像 ${id}：${message}`);
     text("warnings", [...(catalog?.warnings ?? []), ...notes].join("\n"));
     input("timeline").max = String(Math.max(0, frames.length - 1));
@@ -380,8 +382,19 @@ preview.onFrame = (index) => {
       每格延遲: `${animationInterval(header(action).duration, action.frames.length)} ms（1×）`,
       影格數: action.frames.length,
       header: "Extended" in action.header ? "Extended" : "Standard",
+      ...(raw
+        ? {
+            事件: animationEvent(raw.flag).effect,
+            音效編號: animationEvent(raw.flag).audio,
+          }
+        : {}),
       ...("Extended" in action.header
-        ? { reversed: action.header.Extended.reversed }
+        ? {
+            旗標: action.header.Extended.reversed,
+            調色盤欄位:
+              action.header.Extended.reserved[0] |
+              (action.header.Extended.reserved[1] << 8),
+          }
         : {}),
     });
 };
@@ -407,7 +420,7 @@ async function accept(files: ResourceFile[], root: string, job: number) {
     );
   options("palette-source", [
     { value: "current", label: "目前 Graphic 的隱藏調色盤" },
-    { value: "none", label: "僅使用 CGP" },
+    { value: "none", label: "不使用隱藏色表" },
     ...next.graphics.map((set, i) => ({ value: String(i), label: set.name })),
   ]);
   select("anime-source").disabled = !next.animes.length;

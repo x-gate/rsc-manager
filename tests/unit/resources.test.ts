@@ -182,8 +182,15 @@ test("rejects malformed CGP and can initialize again", async () => {
 });
 test("deterministic preview timeline wraps, clamps and supports zero frames", () => {
   expect(frameAt(0, 100, 4)).toBe(0);
+  expect(frameAt(0.35, 0.1, 4)).toBe(3);
   expect(frameAt(399, 100, 4)).toBe(3);
   expect(frameAt(400, 100, 4)).toBe(0);
   expect(frameAt(-10, 100, 4)).toBe(0);
   expect(frameAt(400, 100, 0)).toBe(0);
+});
+
+test("Graphic container addresses retain the unsigned WASM address range", () => {
+  const info = graphicInfo();
+  new DataView(info.buffer).setUint32(4, 0x80000000, true);
+  expect(readIndex(info, "graphic", 0x90000000)[0].addr).toBe(0x80000000);
 });

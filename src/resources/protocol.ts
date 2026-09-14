@@ -31,7 +31,7 @@ export type Request =
       paletteGraphic?: ResourceSet | null;
     }
   | { kind: "search"; type: Kind; query: string; offset: number }
-  | { kind: "graphic"; row: number; animeRow?: number }
+  | { kind: "graphic"; row: number; animeRow?: number; animeAction?: number }
   | { kind: "anime"; row: number }
   | { kind: "resolve"; id: number };
 export type Result =

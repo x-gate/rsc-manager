@@ -18,7 +18,10 @@ export function readIndex(
     const entry: Entry = {
       row: offset / stride,
       id: view.getInt32(offset, true),
-      addr: view.getInt32(offset + 4, true),
+      addr:
+        kind === "graphic"
+          ? view.getUint32(offset + 4, true)
+          : view.getInt32(offset + 4, true),
       len: 0,
     };
     if (kind === "graphic")
@@ -57,10 +60,12 @@ export function preflightAnime(
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   let offset = 0,
     total = 0;
-  // xgtool selects the layout once at the AnimeInfo address, for all actions.
-  const header: 12 | 20 =
-    bytes.length >= 20 && view.getInt32(16, true) === -1 ? 20 : 12;
   for (let action = 0; action < count; action++) {
+    // CGTool detects the extended marker separately for each action.
+    const header =
+      offset + 20 <= bytes.length && view.getInt32(offset + 16, true) === -1
+        ? 20
+        : 12;
     if (offset + header > bytes.length) throw new Error("動畫 header 截斷。");
     const frames = view.getInt32(offset + 8, true);
     total += frames;
@@ -74,7 +79,7 @@ export function preflightAnime(
   }
   if (!allowContainerTail && offset !== bytes.length)
     throw new Error("動畫切片有未解析的尾端資料。");
-  return { headerSize: header, length: offset };
+  return { length: offset };
 }
 export class ResourceSession {
   private graphic?: ResourceSet;
@@ -90,7 +95,9 @@ export class ResourceSession {
   private paletteEntries: Entry[] = [];
   private paletteIds = new Map<number, Entry[]>();
   private cgp!: Contract.Palette;
+  private parsedAnime = new Map<number, Contract.Anime>();
   private animePalette?: {
+    action: number;
     row: number;
     palette: Contract.Palette;
     cgp: boolean;
@@ -130,6 +137,7 @@ export class ResourceSession {
     this.graphic = graphic;
     this.anime = anime;
     this.animePalette = undefined;
+    this.parsedAnime.clear();
     this.animePaletteNote = "";
     this.paletteGraphic = paletteGraphic ?? undefined;
     this.paletteIndex =
@@ -193,7 +201,11 @@ export class ResourceSession {
       throw new Error("檔案長度已變更，請重新選擇資料夾。");
     return bytes;
   }
-  async decode(row: number, animeRow?: number): Promise<Decoded> {
+  async decode(
+    row: number,
+    animeRow?: number,
+    animeAction = 0,
+  ): Promise<Decoded> {
     const entry = this.graphics[row];
     if (!entry) throw new Error("找不到圖像索引列。");
     const { width = 0, height = 0, offX = 0, offY = 0 } = entry;
@@ -203,8 +215,8 @@ export class ResourceSession {
       width > 4096 ||
       height > 4096 ||
       width * height > 4_194_304 ||
-      (animeRow === undefined &&
-        (Math.abs(offX) > 8192 || Math.abs(offY) > 8192))
+      Math.abs(offX) > 8192 ||
+      Math.abs(offY) > 8192
     )
       throw new Error("圖像尺寸或偏移超出預覽上限。");
     const bytes = await this.slice(this.graphic, entry);
@@ -216,27 +228,24 @@ export class ResourceSession {
       header.getInt32(8, true) !== height
     )
       warnings.push(
-        "索引尺寸與 RD header 不符，依 xgtool 使用 GraphicInfo 尺寸。",
+        "索引尺寸與 RD header 不符，依 CGTool 使用 GraphicInfo 尺寸。",
       );
     const index = this.graphicIndex.slice(row * 40, row * 40 + 40);
     if (animeRow !== undefined) {
-      const selected = await this.prepareAnimePalette(animeRow);
-      // Raw BGR stays distinct from CGP. Embedded non-empty palettes win;
-      // palette-less v2/v3 frames inherit the selected Anime palette.
+      const selected = await this.prepareAnimePalette(animeRow, animeAction);
+      // CGTool: high-version sub-palette > embedded palette > selected CGP.
       const graphic = this.parser.graphic_strict_build_from_bytes(
         index,
         bytes,
         rawPalette(selected.palette),
       );
-      const embedded = bytes[2] >= 2 && graphic.palette.colors.length > 0;
-      const palette = embedded ? graphic.palette : selected.palette;
-      const rgba = animationRgba(
-        graphic.payload,
-        palette,
-        width,
-        height,
-        !embedded && selected.cgp,
+      const palette = !selected.cgp ? selected.palette : graphic.palette;
+      warnings.push(
+        selected.cgp && bytes[2] >= 2 && header.getUint32(16, true) > 0
+          ? "動畫調色盤：影格內嵌色表"
+          : this.animePaletteNote,
       );
+      const rgba = animationRgba(graphic.payload, palette, width, height);
       return { row, width, height, offX, offY, rgba, warnings };
     }
     const graphic = this.parser.graphic_strict_build_from_cgp(
@@ -254,12 +263,18 @@ export class ResourceSession {
     }
     return { row, width, height, offX, offY, rgba, warnings };
   }
-  private async prepareAnimePalette(row: number) {
-    if (this.animePalette?.row === row) return this.animePalette;
+  private async prepareAnimePalette(row: number, action = 0) {
+    if (this.animePalette?.row === row && this.animePalette.action === action)
+      return this.animePalette;
+    const parsed = await this.parseAnime(row);
+    const selectedAction = parsed.actions[action];
+    if (!selectedAction && parsed.actions.length)
+      throw new Error("找不到動畫動作。");
+    const extended = selectedAction && "Extended" in selectedAction.header;
     const anime = this.animes[row];
     if (!anime) throw new Error("找不到動畫索引列。");
-    const candidates = this.paletteIds.get(anime.id) ?? [];
-    const entry = candidates[0];
+    const candidates = extended ? (this.paletteIds.get(anime.id) ?? []) : [];
+    const entry = candidates.slice(-1)[0];
     let palette = this.cgp,
       cgp = true;
     this.animePaletteNote = "動畫調色盤：CGP";
@@ -273,8 +288,7 @@ export class ResourceSession {
       )
         throw new Error("隱藏調色盤圖像尺寸超出上限。");
       const data = await this.slice(this.paletteGraphic, entry);
-      if (data.length < 20 || data[2] < 2)
-        throw new Error(`Map ID ${anime.id} 的調色盤圖像沒有內嵌色表。`);
+      if (data.length < 16) throw new Error("隱藏調色盤 header 截斷。");
       const graphic = this.parser.graphic_strict_build_from_bytes(
         this.paletteIndex.slice(entry.row * 40, entry.row * 40 + 40),
         data,
@@ -282,27 +296,37 @@ export class ResourceSession {
       );
       if (graphic.palette.colors.length > 256)
         throw new Error("隱藏調色盤超過 256 色。");
-      if (graphic.palette.colors.length) {
+      if (data[2] >= 2 && graphic.palette.colors.length) {
         palette = graphic.palette;
         cgp = false;
-        this.animePaletteNote = `動畫調色盤：${this.paletteGraphic!.name} · Map ID ${anime.id} · #${entry.row}${candidates.length > 1 ? `（${candidates.length} 筆，依 xgtool 使用首列）` : ""}`;
+        this.animePaletteNote = `動畫調色盤：${this.paletteGraphic!.name} · Map ID ${anime.id} · #${entry.row}${candidates.length > 1 ? `（${candidates.length} 筆，依 CGTool 使用末列）` : ""}`;
       }
-    } else if (this.paletteGraphic) {
+    } else if (extended && this.paletteGraphic) {
       this.animePaletteNote += `（${this.paletteGraphic.name} 沒有 Map ID ${anime.id} 的隱藏調色盤）`;
     }
-    this.animePalette = { row, palette, cgp };
+    this.animePalette = { row, action, palette, cgp };
     return this.animePalette;
   }
-  async openAnime(row: number) {
+  private async parseAnime(row: number) {
+    const cached = this.parsedAnime.get(row);
+    if (cached) return cached;
     const entry = this.animes[row];
     const bytes = await this.slice(this.anime, entry);
     const layout = preflightAnime(bytes, entry.actions ?? 0, true);
-    const anime = this.parser.anime_build_from_bytes_with_header_size(
+    const anime = this.parser.anime_build_from_bytes(
       this.animeIndex.slice(row * 12, row * 12 + 12),
       bytes.subarray(0, layout.length),
-      layout.headerSize,
     );
+    // Keep only the current entry so browsing cannot retain unbounded frame data.
+    this.parsedAnime.clear();
+    this.parsedAnime.set(row, anime);
+    return anime;
+  }
+  async openAnime(row: number) {
+    const anime = await this.parseAnime(row);
     await this.prepareAnimePalette(row);
+    const bytes = await this.slice(this.anime, this.animes[row]);
+    const layout = preflightAnime(bytes, this.animes[row].actions ?? 0, true);
     if (layout.length < bytes.length)
       this.animePaletteNote += `；動作結束後尚有 ${bytes.length - layout.length} bytes 容器間隙，未作為動畫解析。`;
     return anime;

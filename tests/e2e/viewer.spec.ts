@@ -58,7 +58,7 @@ test("Anime action selection, step, playback, missing frames and independent sou
   await expect(page.locator("#entries button")).toHaveCount(1);
   await page.locator("#entries button").click();
   await expect(page.locator("#loading")).toBeHidden();
-  await expect(page.locator("#warnings")).toContainText("暫用首列");
+  await expect(page.locator("#warnings")).toContainText("使用末列");
   await page.getByRole("button", { name: "下一格", exact: true }).click();
   await expect(page.locator("#frame-info")).toContainText("2 / 4");
   await page.getByRole("button", { name: "播放", exact: true }).click();
@@ -177,7 +177,7 @@ test("disabling Anime keeps Graphic browsing available", async ({ page }) => {
   await expect(page.locator("#playback")).toBeHidden();
 });
 
-test("xgtool playback keeps identical frames aligned and applies the selected hidden palette", async ({
+test("CGTool playback keeps identical frames aligned and applies the selected hidden palette", async ({
   page,
 }) => {
   await open(page);
@@ -213,4 +213,29 @@ test("xgtool playback keeps identical frames aligned and applies the selected hi
   expect(
     (await page.locator("#canvas canvas").screenshot()).equals(first),
   ).toBe(true);
+});
+
+test("CGTool action flags mirror the rendered graphic and reset when switching back", async ({
+  page,
+}) => {
+  await open(page);
+  await page.locator("#anime-source").selectOption("1");
+  await expect(page.locator("#loading")).toBeHidden();
+  await page.getByRole("tab", { name: "Anime", exact: true }).click();
+  await expect(page.locator("#loading")).toBeHidden();
+  const canvas = page.locator("#canvas canvas");
+  const normal = await canvas.screenshot();
+  const variants = [];
+  for (const action of ["1", "2", "3"]) {
+    await page.locator("#action").selectOption(action);
+    await expect(page.locator("#loading")).toBeHidden();
+    const mirrored = await canvas.screenshot();
+    expect(mirrored.equals(normal)).toBe(false);
+    for (const previous of variants)
+      expect(mirrored.equals(previous)).toBe(false);
+    variants.push(mirrored);
+  }
+  await page.locator("#action").selectOption("0");
+  await expect(page.locator("#loading")).toBeHidden();
+  expect((await canvas.screenshot()).equals(normal)).toBe(true);
 });

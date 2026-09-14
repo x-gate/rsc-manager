@@ -1,22 +1,38 @@
 import type { Palette } from "../../.generated/xglib/contract";
 import type { Decoded } from "./protocol";
 
-// xgtool Anime.GIF uses integer centiseconds: duration / frame count / 10.
+// CGTool AnimePlayer uses CycleTime / FrameCount in milliseconds.
 export function animationInterval(
   duration: number,
   count: number,
   speed = 1,
   fixedFps = false,
 ) {
-  const delay = count > 0 ? Math.trunc(duration / count / 10) * 10 : 0;
-  // A zero GIF delay has browser-specific playback semantics. Keep a documented
-  // 10 FPS fallback instead of a hot loop or division by zero.
+  const delay = count > 0 ? duration / count : 0;
   return (fixedFps || delay <= 0 ? 100 : delay) / speed;
 }
 
-export function animationFrame(image?: Decoded, error?: string) {
-  // The reference GIF uses a common top-left origin, without either offset.
-  return { image, x: 0, y: 0, error };
+export function animationFrame(image?: Decoded, error?: string, flags = 0) {
+  const flipX = (flags & 1) !== 0,
+    flipY = (flags & 2) !== 0;
+  // The SpriteRenderer path mirrors the sprite around its GraphicInfo pivot.
+  // Frame offsets remain metadata; they are not added to the Graphic offsets.
+  return {
+    image,
+    x: image?.offX ?? 0,
+    y: image?.offY ?? 0,
+    flipX,
+    flipY,
+    error,
+  };
+}
+
+export function animationEvent(flag: number) {
+  return flag > 20000
+    ? { effect: "命中", audio: flag - 20000 }
+    : flag > 10000
+      ? { effect: "攻擊結束", audio: flag - 10000 }
+      : { effect: "無", audio: flag };
 }
 
 export function rawPalette(palette: Palette) {
@@ -30,24 +46,18 @@ export function animationRgba(
   palette: Palette,
   width: number,
   height: number,
-  cgp: boolean,
 ) {
   const rgba = new Uint8Array(width * height * 4);
   for (let i = 0; i < payload.length; i++) {
     const index = payload[i],
       color = palette.colors[index];
     if (!color) throw new Error("動畫色彩索引超出調色盤。");
-    const { red, green, blue } = color;
-    // xgtool color keys apply to raw/embedded palettes and CGP custom colors,
-    // but not the fixed CGP prefix/suffix (including their pure RGB colors).
-    const keyed = !cgp || (index >= 16 && index < 240);
-    const transparent =
-      [red, green, blue].every((c) => c === 0 || c === 255) &&
-      [red, green, blue].filter((c) => c === 255).length <= 1;
-    const alpha = keyed ? (transparent ? 0 : 255) : color.alpha;
     const target =
       ((height - 1 - Math.floor(i / width)) * width + (i % width)) * 4;
-    rgba.set([red, green, blue, alpha], target);
+    rgba.set(
+      [color.red, color.green, color.blue, index === 0 ? 0 : color.alpha],
+      target,
+    );
   }
   return rgba;
 }

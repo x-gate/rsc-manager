@@ -13,6 +13,8 @@ export function graphicBytes(width = 24, height = 32, color = 16) {
       if (y > height - 12 && y < height - 9 && (x === 8 || x === width - 9))
         bytes[16 + y * width + x] = 17;
     }
+  if (width > 10 && height > 10)
+    bytes[16 + 6 * width + 5] = color === 17 ? 16 : 17;
   return bytes;
 }
 export function graphicInfo(
@@ -106,8 +108,17 @@ export function syntheticResources() {
     ["Assets/bin/GraphicEx_5.bin", graphicBytes(24, 32, 17)],
     ["Assets/bin/AnimeInfo_4.bin", aIndex],
     ["Assets/bin/Anime_4.bin", join(first, second)],
-    ["Assets/bin/AnimeInfoEx_1.Bin", animeInfo(300, 0, 1)],
-    ["Assets/bin/AnimeEx_1.Bin", actionBytes([2, 2], true)],
+    ["Assets/bin/AnimeInfoEx_1.Bin", animeInfo(300, 0, 4)],
+    [
+      "Assets/bin/AnimeEx_1.Bin",
+      join(
+        ...[0, 1, 2, 3].map((flags) => {
+          const bytes = actionBytes([2, 2], true, flags);
+          new DataView(bytes.buffer).setInt16(14, flags, true);
+          return bytes;
+        }),
+      ),
+    ],
     ["Assets/bin/GraphicInfoPalette_1.bin", hidden.info],
     ["Assets/bin/GraphicPalette_1.bin", hidden.data],
     ["Assets/bin/pal/palet_00.cgp", paletteBytes()],
@@ -134,7 +145,7 @@ export function embeddedGraphic(
 }
 export function hiddenPaletteResources() {
   const palette = new Uint8Array(256 * 3);
-  palette.set([40, 70, 90], 0); // A non-key color at index zero must remain opaque.
+  palette.set([40, 70, 90], 0); // Index zero stays transparent even with non-black RGB.
   palette.set([25, 60, 210], 17 * 3);
   const data = embeddedGraphic(new Uint8Array(), palette, 0, 0);
   const info = graphicInfo(900, 0, data.length, 0, 0);

@@ -1,5 +1,7 @@
 # 資源檢視器整合紀錄
 
+> 後續修正：目前行為以 [CGTool 對照](animation-cgtool.md) 為準；以下保留歷史整合紀錄。
+
 日期：2026-09-14。
 
 此節以下保留首次整合紀錄；後續動畫修正以 [xgtool 對照紀錄](animation-xgtool.md) 與 README 的目前規則為準。

@@ -40,7 +40,11 @@ self.onmessage = ({ data }: MessageEvent<{ id: number; request: Request }>) => {
           };
           break;
         case "graphic": {
-          const value = await session.decode(request.row, request.animeRow);
+          const value = await session.decode(
+            request.row,
+            request.animeRow,
+            request.animeAction,
+          );
           result = { kind: "graphic", value };
           transfer.push(value.rgba.buffer);
           break;

@@ -5,10 +5,13 @@ export interface PreviewFrame {
   x: number;
   y: number;
   error?: string;
+  flipX?: boolean;
+  flipY?: boolean;
 }
 export function frameAt(elapsed: number, interval: number, count: number) {
   return count > 0
-    ? Math.floor(Math.max(0, elapsed) / Math.max(1, interval)) % count
+    ? Math.floor(Math.max(0, elapsed) / Math.max(Number.EPSILON, interval)) %
+        count
     : 0;
 }
 export class Preview {
@@ -163,10 +166,12 @@ export class Preview {
       maxY = 1;
     for (const frame of this.frames)
       if (frame.image) {
-        minX = Math.min(minX, frame.x);
-        minY = Math.min(minY, frame.y);
-        maxX = Math.max(maxX, frame.x + frame.image.width);
-        maxY = Math.max(maxY, frame.y + frame.image.height);
+        const x = frame.flipX ? -frame.x - frame.image.width : frame.x;
+        const y = frame.flipY ? -frame.y - frame.image.height : frame.y;
+        minX = Math.min(minX, x);
+        minY = Math.min(minY, y);
+        maxX = Math.max(maxX, x + frame.image.width);
+        maxY = Math.max(maxY, y + frame.image.height);
       }
     this.setZoom(
       Math.min(
@@ -188,7 +193,11 @@ export class Preview {
     this.sprite.visible = !!frame?.image;
     if (frame?.image) {
       this.sprite.texture = this.textures.get(frame.image.row)!;
-      this.sprite.position.set(frame.x, frame.y);
+      this.sprite.scale.set(frame.flipX ? -1 : 1, frame.flipY ? -1 : 1);
+      this.sprite.position.set(
+        frame.flipX ? -frame.x : frame.x,
+        frame.flipY ? -frame.y : frame.y,
+      );
     }
     this.onFrame(index);
   }

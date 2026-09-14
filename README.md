@@ -54,19 +54,15 @@ Chrome / Edge 可將唯讀資料夾 handle 記在本網站的 IndexedDB。下次
 
 ## 動畫播放規則與界限
 
-動畫流程以 [xgtool 的固定版本](https://github.com/x-gate/xgtool/tree/a5176dbf107f2f1567951476f652391b76f7f702) 為相容性依據。每筆 Anime 在起點判斷一次 12 / 20-byte header，後續動作固定沿用；每個方向仍能單獨選取。依 ActCnt 找出實際動畫長度；索引間的剩餘 bytes 會提示為容器間隙，不送進單筆 WASM 解析器。
+目前以 [CGTool b4d0811](https://github.com/HonorLee-cn/CGTool/tree/b4d08112524aa16b9fdb416ef865f8c196ffac20) 為基準，取代先前 xgtool GIF 規則。每個動作獨立偵測 standard / extended header，容器間隙仍保留診斷。
 
-預設每格延遲依 xgtool GIF 換算：`trunc(duration / frameCount / 10) × 10 ms`，先截整到 10 ms 再套用速度。可切換固定 10 FPS，或選 0.5×、1×、2×。若截整結果為零或負值，本工具明確提示並使用 10 FPS，避免零延遲迴圈；這項 fallback 是檢視器自行設計。
+每格延遲為 `duration / frameCount / speed` 毫秒，保留小數。可切換固定 10 FPS；週期為零或負值時提示並使用 10 FPS（檢視器設計）。影格使用 GraphicInfo 偏移，不相加 frame 偏移；extended 旗標 bit 0 / 1 分別作水平／垂直鏡射，整段 fit 包含鏡射後 bounds。原始 frame 偏移與旗標仍可檢視，命中／攻擊結束與音效編號只顯示資訊。
 
-動畫影格依原始順序播放，共用左上原點與整段最大尺寸，不相加 Graphic / frame 偏移，也不依 reversed 反轉順序；offset、flag、reversed 仍顯示原始值。這符合參考工具的 GIF 合成流程。預覽區高度改變時同步調整 PixiJS 畫布與置中範圍。圖像維持完整 bottom-up → top-down 轉換，不複製參考 GIF 圖像轉換中邊界外掃描列的裁切行為。
+「動畫隱藏調色盤」僅對 extended 動作生效，從選定 Graphic 來源以 `AnimeInfo.ID → GraphicInfo.MapID` 找末列。優先順序：隱藏色表 > 影格非空內嵌色表 > CGP；空內嵌色表回退外部。沒有隱藏色表時使用內嵌／CGP；損壞資料保留診斷。所有色表採索引 0 透明，其他顏色不因純黑／紅／綠／藍而透明。
 
-「動畫隱藏調色盤」預設從目前 Graphic 來源，以 `AnimeInfo.ID → GraphicInfo.MapID` 尋找第一列，取得其內嵌 BGR 色表；可以明確選擇另一個 Graphic 來源，或選「僅使用 CGP」。找不到對應時使用 CGP，有對應但資料損壞時顯示錯誤。圖像自己的非空內嵌色表優先，其次是隱藏色表，最後為 CGP。診斷區會顯示實際選用的來源、Map ID 與索引列。
+動畫圖像依目前選取來源的 `graphic_id` 查找；重複 ID 用末列並提示，Graphic 分頁保留全部索引列。來源之間不自動混合。GraphicInfo 尺寸優先於 RD header，差異警告；strict 像素數檢查保留。完整差異與保留範圍見 [CGTool 對照](docs/animation-cgtool.md)。
 
-例如參考工具的 V3 / PUK2 / PUK3 動畫可能需要 GraphicV3 作為隱藏色表來源，Joy 則可能用各自的 Graphic；本工具讓使用者明確選取，不從檔名推測映射。動畫用 raw / embedded 色表中的純黑、純紅、純綠、純藍作透明色鍵；CGP 僅對自訂的 224 色套用，固定前後色保持各自透明度。靜態 Graphic 的通用色表語意不受此動畫呈現規則影響。
-
-動畫只在目前選取的 Graphic 來源中尋找 `graphic_id`。重複 ID 依 xgtool 使用首列並顯示診斷；Graphic 分頁仍可逐列檢視。缺少或無法解碼的圖像在對應影格顯示原因，不會借用其他資源集或前一格圖像。GraphicInfo 尺寸優先於不可靠的 RD header 尺寸，差異會警告；strict 像素長度驗證仍保留。
-
-索引上限一百萬列。單筆圖像與動畫切片最多 16 MiB；圖像邊長最多 4096、像素最多 4,194,304，靜態 Graphic 偏移絕對值最多 8192（動畫不套用偏移）。單筆 Anime 最多 4096 個動作、100,000 個 frame；單一動作最多預覽 512 張獨立圖像，RGBA 合計最多 128 MiB。這是 RGBA 預覽上限，並非包含 WASM、canvas、GPU 與索引的總記憶體上限。
+索引上限一百萬列。單筆圖像與動畫切片最多 16 MiB；圖像邊長最多 4096、像素最多 4,194,304，Graphic 偏移絕對值最多 8192（靜態與動畫皆適用）。單筆 Anime 最多 4096 個動作、100,000 個 frame；單一動作最多預覽 512 張獨立圖像，RGBA 合計最多 128 MiB。這是 RGBA 預覽上限，並非包含 WASM、canvas、GPU 與索引的總記憶體上限。
 
 動畫進入 WASM 前會依目前 xglib header 規則檢查 frame 配置量與完整切片。xglib RLE 仍無完整的解壓配置上限，Worker 隔離與上述檢查不等於任意惡意檔案的安全保證。
 
@@ -98,7 +94,7 @@ E2E 使用已安裝的 Google Chrome；缺少時可用 `bunx playwright install 
 | `src/main.ts` / `style.css`                             | 目錄流程、搜尋分頁、預覽與診斷介面           |
 | `scripts/build-wasm.ts`                                 | 依 Cargo.lock 編譯 xglib 與產生 bindings     |
 
-唯一跨 repository 依賴是 `rsc-manager → xglib`，無公開網路 API。使用 `graphic_strict_build_from_cgp`、`game_palette_build_from_cgp` 與 `anime_build_from_bytes_with_header_size`；傳入 `Uint8Array`，契約複製自 xglib 的 `xglib.d.ts`。xglib 須使用 `272a371` 或包含新增明確 header layout 入口的後續版本；更新後重跑 `bun run build:wasm`。map-viewer 不需變更。建置與部署順序為準備 xglib → 產生 WASM → 建置 rsc-manager → 部署 dist。整合基準和驗證範圍見 [整合紀錄](docs/integration.md)。
+唯一跨 repository 依賴是 `rsc-manager → xglib`，無公開網路 API。使用 `graphic_strict_build_from_cgp`、`game_palette_build_from_cgp` 與 `anime_build_from_bytes`；傳入 `Uint8Array`，契約複製自 xglib 的 `xglib.d.ts`。xglib 須使用 `d1480b4` 或包含 CGTool 修正的後續版本；更新後重跑 `bun run build:wasm`。map-viewer 亦已整合同一 xglib 基準；兩個 viewer 分別建置。建置與部署順序為準備 xglib → 產生 WASM → 建置 rsc-manager → 部署 dist。整合基準和驗證範圍見 [整合紀錄](docs/integration.md)。
 
 ## 授權與歸屬
 
