@@ -43,7 +43,11 @@ async function session() {
 }
 test("discovers mixed case Graphic/Anime pairs independently, without requiring maps", () => {
   const c = catalog();
-  expect(c.graphics.map((s) => s.name)).toEqual(["Graphic_1", "GraphicEx_5"]);
+  expect(c.graphics.map((s) => s.name)).toEqual([
+    "Graphic_1",
+    "GraphicEx_5",
+    "GraphicPalette_1",
+  ]);
   expect(c.animes.map((s) => s.name)).toEqual(["Anime_4", "AnimeEx_1"]);
 });
 test("rejects wrong roots, missing graphics and case collisions", () => {
@@ -118,7 +122,7 @@ test("bounds index addresses, dimensions and truncated record lengths", async ()
     undefined,
     c.palettes[0].file,
   );
-  await expect(s.decode(0)).rejects.toThrow("RD header");
+  await expect(s.decode(0)).rejects.toContain("graphic payload");
   expect(() => readIndex(new Uint8Array(41), "graphic", 100)).toThrow("40");
 });
 test("uses next distinct address for unsorted Anime rows and preserves duplicate IDs and addresses", async () => {

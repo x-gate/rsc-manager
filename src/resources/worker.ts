@@ -19,6 +19,7 @@ self.onmessage = ({ data }: MessageEvent<{ id: number; request: Request }>) => {
               request.graphic,
               request.anime,
               request.palette,
+              request.paletteGraphic,
             )),
           };
           break;
@@ -35,10 +36,11 @@ self.onmessage = ({ data }: MessageEvent<{ id: number; request: Request }>) => {
           result = {
             kind: "anime",
             value: await session.openAnime(request.row),
+            paletteNote: session.animePaletteNote,
           };
           break;
         case "graphic": {
-          const value = await session.decode(request.row);
+          const value = await session.decode(request.row, request.animeRow);
           result = { kind: "graphic", value };
           transfer.push(value.rgba.buffer);
           break;

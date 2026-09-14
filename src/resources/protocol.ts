@@ -20,16 +20,23 @@ export interface Decoded {
   offX: number;
   offY: number;
   rgba: Uint8Array;
+  warnings?: string[];
 }
 export type Request =
-  | { kind: "init"; graphic: ResourceSet; anime?: ResourceSet; palette: File }
+  | {
+      kind: "init";
+      graphic: ResourceSet;
+      anime?: ResourceSet;
+      palette: File;
+      paletteGraphic?: ResourceSet | null;
+    }
   | { kind: "search"; type: Kind; query: string; offset: number }
-  | { kind: "graphic"; row: number }
+  | { kind: "graphic"; row: number; animeRow?: number }
   | { kind: "anime"; row: number }
   | { kind: "resolve"; id: number };
 export type Result =
   | { kind: "init"; graphics: number; animes: number; duplicates: number }
   | { kind: "search"; entries: Entry[]; total: number }
   | { kind: "graphic"; value: Decoded }
-  | { kind: "anime"; value: Anime }
+  | { kind: "anime"; value: Anime; paletteNote: string }
   | { kind: "resolve"; rows: number[] };

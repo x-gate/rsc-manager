@@ -90,7 +90,13 @@ export class Preview {
       else return;
       event.preventDefault();
     });
-    this.observer = new ResizeObserver(() => this.fit());
+    this.observer = new ResizeObserver(() => {
+      if (host.clientWidth && host.clientHeight) {
+        // Pixi's resizeTo listens to window resize, not playback-panel changes.
+        this.app.resize();
+        this.fit();
+      }
+    });
     this.observer.observe(host);
   }
   clear() {
@@ -127,12 +133,13 @@ export class Preview {
       texture.source.scaleMode = "nearest";
       this.textures.set(image.row, texture);
     }
+    this.app.resize();
     this.fit();
     this.draw();
   }
   setInterval(interval: number) {
+    this.elapsed = (this.elapsed / this.interval) * interval;
     this.interval = interval;
-    this.elapsed = Math.max(0, this.current) * interval;
   }
   seek(index: number) {
     this.elapsed = index * this.interval;

@@ -88,13 +88,17 @@ export function syntheticResources() {
     data.push(graphic);
     offset += graphic.length;
   }
-  const first = join(actionBytes([1, 2, 1, 2]), actionBytes([2, 999], true, 1));
+  const first = join(
+    actionBytes([1, 2, 1, 2], true),
+    actionBytes([2, 999], true, 1),
+  );
   const second = actionBytes([2, 1], true, 2);
   const aIndex = join(
     animeInfo(200, first.length, 1),
     animeInfo(100, 0, 2),
     animeInfo(100, 0, 2),
   );
+  const hidden = hiddenPaletteResources();
   return new Map<string, Uint8Array>([
     ["Assets/bin/GraphicInfo_1.bin", join(...index)],
     ["Assets/bin/Graphic_1.bin", join(...data)],
@@ -103,8 +107,37 @@ export function syntheticResources() {
     ["Assets/bin/AnimeInfo_4.bin", aIndex],
     ["Assets/bin/Anime_4.bin", join(first, second)],
     ["Assets/bin/AnimeInfoEx_1.Bin", animeInfo(300, 0, 1)],
-    ["Assets/bin/AnimeEx_1.Bin", actionBytes([2], true)],
+    ["Assets/bin/AnimeEx_1.Bin", actionBytes([2, 2], true)],
+    ["Assets/bin/GraphicInfoPalette_1.bin", hidden.info],
+    ["Assets/bin/GraphicPalette_1.bin", hidden.data],
     ["Assets/bin/pal/palet_00.cgp", paletteBytes()],
     ["Assets/bin/pal/palet_01.cgp", paletteBytes(true)],
   ]);
+}
+
+export function embeddedGraphic(
+  pixels: Uint8Array,
+  palette: Uint8Array,
+  width = 1,
+  height = 1,
+) {
+  const bytes = new Uint8Array(20 + pixels.length + palette.length),
+    view = new DataView(bytes.buffer);
+  bytes.set([82, 68, 2, 0]);
+  view.setInt32(4, width, true);
+  view.setInt32(8, height, true);
+  view.setInt32(12, bytes.length, true);
+  view.setUint32(16, palette.length, true);
+  bytes.set(pixels, 20);
+  bytes.set(palette, 20 + pixels.length);
+  return bytes;
+}
+export function hiddenPaletteResources() {
+  const palette = new Uint8Array(256 * 3);
+  palette.set([40, 70, 90], 0); // A non-key color at index zero must remain opaque.
+  palette.set([25, 60, 210], 17 * 3);
+  const data = embeddedGraphic(new Uint8Array(), palette, 0, 0);
+  const info = graphicInfo(900, 0, data.length, 0, 0);
+  new DataView(info.buffer).setInt32(36, 300, true); // Lookup is Map ID, not graphic ID.
+  return { info, data };
 }

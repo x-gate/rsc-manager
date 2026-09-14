@@ -2,6 +2,8 @@
 
 日期：2026-09-14。
 
+此節以下保留首次整合紀錄；後續動畫修正以 [xgtool 對照紀錄](animation-xgtool.md) 與 README 的目前規則為準。
+
 ## 背景與決策
 
 rsc-manager 由 bun create pixi.js 起始模板建立。依工作區規則，資源只由使用者指定的本機遊戲根目錄讀取，解析交由既有 xglib WASM；不建立後端、不修改或納入原版資料。

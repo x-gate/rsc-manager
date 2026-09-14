@@ -176,3 +176,41 @@ test("disabling Anime keeps Graphic browsing available", async ({ page }) => {
   await expect(page.locator("#count")).toHaveText("0 筆");
   await expect(page.locator("#playback")).toBeHidden();
 });
+
+test("xgtool playback keeps identical frames aligned and applies the selected hidden palette", async ({
+  page,
+}) => {
+  await open(page);
+  await page.locator("#anime-source").selectOption("1");
+  await expect(page.locator("#loading")).toBeHidden();
+  await page.getByRole("tab", { name: "Anime", exact: true }).click();
+  await expect(page.locator("#loading")).toBeHidden();
+  await expect(page.locator("#selected-title")).toHaveText("ID 300");
+  await expect(page.locator("#metadata")).toContainText("200 ms");
+  const first = await page
+    .locator("#canvas canvas")
+    .screenshot({ path: ".generated/frame-first.png" });
+  await page.getByRole("button", { name: "下一格", exact: true }).click();
+  await expect(page.locator("#frame-info")).toContainText("offset 2, -1");
+  const second = await page
+    .locator("#canvas canvas")
+    .screenshot({ path: ".generated/frame-second.png" });
+  expect(second.equals(first)).toBe(true);
+  await page.getByRole("button", { name: "播放", exact: true }).click();
+  await expect
+    .poll(() => page.locator("#timeline").inputValue(), { intervals: [30] })
+    .toBe("0");
+  await page.getByRole("button", { name: "暫停", exact: true }).click();
+  await page.locator("#palette-source").selectOption("2");
+  await expect(page.locator("#loading")).toBeHidden();
+  await expect(page.locator("#warnings")).toContainText(
+    "GraphicPalette_1 · Map ID 300 · #0",
+  );
+  const hidden = await page.locator("#canvas canvas").screenshot();
+  expect(hidden.equals(first)).toBe(false);
+  await page.locator("#palette-source").selectOption("none");
+  await expect(page.locator("#loading")).toBeHidden();
+  expect(
+    (await page.locator("#canvas canvas").screenshot()).equals(first),
+  ).toBe(true);
+});
