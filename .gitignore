@@ -22,3 +22,8 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+.generated/
+test-results/
+playwright-report/
+CGoriginmood/

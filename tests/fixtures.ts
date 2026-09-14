@@ -1,0 +1,110 @@
+// Original synthetic bytes only. No original game content is used in tests.
+export function graphicBytes(width = 24, height = 32, color = 16) {
+  const bytes = new Uint8Array(16 + width * height),
+    view = new DataView(bytes.buffer);
+  bytes.set([82, 68, 0, 0]);
+  view.setInt32(4, width, true);
+  view.setInt32(8, height, true);
+  view.setInt32(12, bytes.length, true);
+  for (let y = 0; y < height; y++)
+    for (let x = 0; x < width; x++) {
+      if (x > 3 && x < width - 4 && y > 2 && y < height - 3)
+        bytes[16 + y * width + x] = color;
+      if (y > height - 12 && y < height - 9 && (x === 8 || x === width - 9))
+        bytes[16 + y * width + x] = 17;
+    }
+  return bytes;
+}
+export function graphicInfo(
+  id = 1,
+  addr = 0,
+  len = 784,
+  width = 24,
+  height = 32,
+) {
+  const bytes = new Uint8Array(40),
+    view = new DataView(bytes.buffer);
+  view.setInt32(0, id, true);
+  view.setInt32(4, addr, true);
+  view.setInt32(8, len, true);
+  view.setInt32(12, -12, true);
+  view.setInt32(16, -32, true);
+  view.setInt32(20, width, true);
+  view.setInt32(24, height, true);
+  view.setInt32(36, id + 1000, true);
+  return bytes;
+}
+export function animeInfo(id: number, addr: number, count: number) {
+  const bytes = new Uint8Array(12),
+    view = new DataView(bytes.buffer);
+  view.setInt32(0, id, true);
+  view.setInt32(4, addr, true);
+  view.setInt16(8, count, true);
+  return bytes;
+}
+export function actionBytes(ids = [1, 2], extended = false, action = 0) {
+  const size = extended ? 20 : 12,
+    bytes = new Uint8Array(size + ids.length * 10),
+    view = new DataView(bytes.buffer);
+  view.setInt16(0, 3, true);
+  view.setInt16(2, action, true);
+  view.setInt32(4, 400, true);
+  view.setInt32(8, ids.length, true);
+  if (extended) {
+    bytes.set([0xab, 0xcd], 12);
+    view.setInt16(14, 1, true);
+    view.setInt32(16, -1, true);
+  }
+  ids.forEach((id, i) => {
+    view.setInt32(size + i * 10, id, true);
+    view.setInt16(size + i * 10 + 4, i * 2, true);
+    view.setInt16(size + i * 10 + 6, -i, true);
+    view.setInt16(size + i * 10 + 8, 5, true);
+  });
+  return bytes;
+}
+export function join(...records: Uint8Array[]) {
+  const bytes = new Uint8Array(records.reduce((sum, r) => sum + r.length, 0));
+  let offset = 0;
+  for (const record of records) {
+    bytes.set(record, offset);
+    offset += record.length;
+  }
+  return bytes;
+}
+export function paletteBytes(blue = false) {
+  const bytes = new Uint8Array(708);
+  bytes.set(blue ? [210, 130, 70, 50, 40, 30] : [75, 166, 103, 210, 238, 223]);
+  return bytes;
+}
+export function syntheticResources() {
+  const index: Uint8Array[] = [],
+    data: Uint8Array[] = [];
+  let offset = 0;
+  for (let row = 0; row < 65; row++) {
+    const graphic = graphicBytes(24, 32, row % 2 ? 17 : 16);
+    if (row === 64) graphic[0] = 0;
+    index.push(graphicInfo(row === 2 ? 1 : row + 1, offset, graphic.length));
+    data.push(graphic);
+    offset += graphic.length;
+  }
+  const first = join(actionBytes([1, 2, 1, 2]), actionBytes([2, 999], true, 1));
+  const second = actionBytes([2, 1], true, 2);
+  const aIndex = join(
+    animeInfo(200, first.length, 1),
+    animeInfo(100, 0, 2),
+    animeInfo(100, 0, 2),
+  );
+  return new Map<string, Uint8Array>([
+    ["Assets/bin/GraphicInfo_1.bin", join(...index)],
+    ["Assets/bin/Graphic_1.bin", join(...data)],
+    ["Assets/bin/GraphicInfoEx_5.bin", graphicInfo(2)],
+    ["Assets/bin/GraphicEx_5.bin", graphicBytes(24, 32, 17)],
+    ["Assets/bin/AnimeInfo_4.bin", aIndex],
+    ["Assets/bin/Anime_4.bin", join(first, second)],
+    ["Assets/bin/AnimeInfoEx_1.Bin", animeInfo(300, 0, 1)],
+    ["Assets/bin/AnimeEx_1.Bin", actionBytes([2], true)],
+    ["Assets/bin/pal/palet_00.cgp", paletteBytes()],
+    ["Assets/bin/pal/palet_01.cgp", paletteBytes(true)],
+  ]);
+}
