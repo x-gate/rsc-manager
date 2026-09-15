@@ -33,10 +33,24 @@ bun run dev
     ├── Anime_4.bin
     ├── AnimeInfoEx_1.Bin
     ├── AnimeEx_1.Bin
+    ├── Puk2/
+    │   ├── GraphicInfo_PUK2_2.bin
+    │   ├── Graphic_PUK2_2.bin
+    │   ├── AnimeInfo_PUK2_4.bin
+    │   └── Anime_PUK2_4.bin
+    ├── Puk3/
+    │   ├── GraphicInfo_PUK3_1.bin
+    │   ├── Graphic_PUK3_1.bin
+    │   ├── AnimeInfo_PUK3_2.bin
+    │   └── Anime_PUK3_2.bin
     └── pal/palet_00.cgp
 ```
 
 檔名配對不區分大小寫；`GraphicInfo<後綴>.bin` 與 `Graphic<後綴>.bin` 配對，Anime 同理。大小寫衝突會報錯；缺少配對資料檔會提示。Graphic 和 Anime 的尾碼沒有被視為相同版本契約，需由使用者分別選取。
+
+兩種資料夾選取方式都會搜尋 `Assets/bin` 及其子目錄，包含 Puk2／Puk3；只在同一目錄內配對，不跨目錄合併同名檔案。來源選單保留子目錄，例如 `Puk2/Graphic_PUK2_2`；CGP 也保留相對路徑以區分同名色表。仍選擇包含 Assets 的遊戲根目錄，無需搬動原版檔案。已載入舊目錄清單時，請重新選取根目錄以重新掃描。
+
+Puk2／Puk3 的實測數量與少數 strict 圖像錯誤、缺少引用等限制，見 [子目錄載入驗證](docs/puk-resources.md)。
 
 Chrome / Edge 可將唯讀資料夾 handle 記在本網站的 IndexedDB。下次點「繼續使用」時重新要求讀取權限；不記錄檔案 bytes。瀏覽器可能撤銷授權。「忘記資料夾」清除記錄與目前資源，不修改遊戲資料。
 

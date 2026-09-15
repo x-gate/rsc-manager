@@ -123,6 +123,14 @@ export function syntheticResources() {
     ["Assets/bin/GraphicPalette_1.bin", hidden.data],
     ["Assets/bin/pal/palet_00.cgp", paletteBytes()],
     ["Assets/bin/pal/palet_01.cgp", paletteBytes(true)],
+    ["Assets/bin/Puk2/GraphicInfo_PUK2_2.bin", graphicInfo(201)],
+    ["Assets/bin/Puk2/Graphic_PUK2_2.bin", graphicBytes()],
+    ["Assets/bin/Puk2/AnimeInfo_PUK2_4.bin", animeInfo(1201, 0, 1)],
+    ["Assets/bin/Puk2/Anime_PUK2_4.bin", actionBytes([201, 201], true)],
+    ["Assets/bin/Puk3/GraphicInfo_PUK3_1.bin", graphicInfo(301)],
+    ["Assets/bin/Puk3/Graphic_PUK3_1.bin", graphicBytes(24, 32, 17)],
+    ["Assets/bin/Puk3/AnimeInfo_PUK3_2.bin", animeInfo(1301, 0, 1)],
+    ["Assets/bin/Puk3/Anime_PUK3_2.bin", actionBytes([301, 301], true)],
   ]);
 }
 

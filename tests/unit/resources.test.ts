@@ -47,8 +47,73 @@ test("discovers mixed case Graphic/Anime pairs independently, without requiring 
     "Graphic_1",
     "GraphicEx_5",
     "GraphicPalette_1",
+    "Puk2/Graphic_PUK2_2",
+    "Puk3/Graphic_PUK3_1",
   ]);
-  expect(c.animes.map((s) => s.name)).toEqual(["Anime_4", "AnimeEx_1"]);
+  expect(c.animes.map((s) => s.name)).toEqual([
+    "Anime_4",
+    "AnimeEx_1",
+    "Puk2/Anime_PUK2_4",
+    "Puk3/Anime_PUK3_2",
+  ]);
+});
+test("nested versions decode through WASM after discovery", async () => {
+  const c = catalog();
+  for (const [folder, id] of [
+    ["Puk2", 201],
+    ["Puk3", 301],
+  ] as const) {
+    const s = new ResourceSession(parser);
+    await s.initialize(
+      c.graphics.find((g) => g.name.startsWith(folder + "/"))!,
+      c.animes.find((a) => a.name.startsWith(folder + "/"))!,
+      c.palettes[0].file,
+    );
+    const anime = await s.openAnime(0);
+    expect(anime.actions[0].frames[0].graphic_id).toBe(id);
+    expect((await s.decode(s.resolve(id)[0], 0)).rgba.length).toBe(24 * 32 * 4);
+  }
+});
+test("pairs only within the same directory and retains same-name nested sources", () => {
+  const c = catalog();
+  const at = (path: string) => ({ path, file: c.graphics[0].info.file });
+  const result = discover(
+    [
+      c.palettes[0],
+      at("Assets/bin/Puk2/GraphicInfo_1.bin"),
+      at("Assets/bin/Puk2/Graphic_1.bin"),
+      at("Assets/bin/Puk3/GraphicInfo_1.bin"),
+      at("Assets/bin/Puk3/Graphic_1.bin"),
+      at("Assets/bin/Puk3/AnimeInfo_1.bin"),
+      at("Assets/bin/Puk2/Anime_1.bin"),
+      at("Assets/bin/Puk3/pal/palet_00.cgp"),
+      at("Saves/GraphicInfo_1.bin"),
+      at("Saves/Graphic_1.bin"),
+      at("Assets/bin/notes.txt"),
+    ],
+    "root",
+  );
+  expect(result.graphics.map((g) => g.name)).toEqual([
+    "Puk2/Graphic_1",
+    "Puk3/Graphic_1",
+  ]);
+  expect(result.animes).toHaveLength(0);
+  expect(result.warnings).toEqual([
+    "Assets/bin/Puk3/AnimeInfo_1.bin 缺少同目錄的 Anime_1.bin。",
+  ]);
+  expect(result.palettes.map((p) => p.path)).toContain(
+    "Assets/bin/Puk3/pal/palet_00.cgp",
+  );
+  expect(() =>
+    discover(
+      [
+        ...result.graphics.flatMap((g) => [g.info, g.data]),
+        at("assets/BIN/puk2/graphicinfo_1.BIN"),
+        c.palettes[0],
+      ],
+      "root",
+    ),
+  ).toThrow("大小寫衝突");
 });
 test("rejects wrong roots, missing graphics and case collisions", () => {
   expect(() => discover([], "root")).toThrow("遊戲根目錄");

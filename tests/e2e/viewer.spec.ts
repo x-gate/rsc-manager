@@ -8,6 +8,38 @@ async function open(page: Page) {
   await expect(page.locator("#selected-title")).toHaveText("ID 1");
   await expect(page.locator("#loading")).toBeHidden();
 }
+async function checkExpansionSources(page: Page) {
+  for (const [folder, graphic, anime, id] of [
+    ["Puk2", "Graphic_PUK2_2", "Anime_PUK2_4", 1201],
+    ["Puk3", "Graphic_PUK3_1", "Anime_PUK3_2", 1301],
+  ] as const) {
+    await page.getByRole("tab", { name: "Graphic", exact: true }).click();
+    await page
+      .locator("#graphic-source")
+      .selectOption({ label: folder + "/" + graphic });
+    await expect(page.locator("#loading")).toBeHidden();
+    await expect(page.locator("#empty")).toBeHidden();
+    await page
+      .locator("#anime-source")
+      .selectOption({ label: folder + "/" + anime });
+    await expect(page.locator("#loading")).toBeHidden();
+    await page.getByRole("tab", { name: "Anime", exact: true }).click();
+    await expect(page.locator("#selected-title")).toHaveText("ID " + id);
+    await expect(page.locator("#loading")).toBeHidden();
+    await expect(page.locator("#playback")).toBeVisible();
+    await expect(page.locator("#empty")).toBeHidden();
+    await expect(page.locator("#warnings")).not.toContainText("缺少 ID");
+    await page.getByRole("button", { name: "下一格", exact: true }).click();
+    await expect(page.locator("#frame-info")).toContainText("2 / 2");
+  }
+}
+test("file-list folder selection loads Puk2 and Puk3 graphics and animations", async ({
+  page,
+}) => {
+  await open(page);
+  await checkExpansionSources(page);
+  await expect(page.locator("#error")).toBeHidden();
+});
 test("onboarding is local and has no remote requests", async ({ page }) => {
   const remote: string[] = [];
   page.on("request", (r) => {
@@ -161,6 +193,7 @@ test("directory picker scans local handles even when persistence is unavailable"
   await expect(page.locator("#selected-title")).toHaveText("ID 1");
   await expect(page.locator("#loading")).toBeHidden();
   await expect(page.locator("#error")).toContainText("瀏覽器無法記住此資料夾");
+  await checkExpansionSources(page);
   await page.getByRole("tab", { name: "Anime", exact: true }).click();
   await expect(page.locator("#playback")).toBeVisible();
   await expect(page.locator("#loading")).toBeHidden();

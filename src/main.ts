@@ -428,7 +428,10 @@ async function accept(files: ResourceFile[], root: string, job: number) {
     select("anime-source").add(new Option("不載入 Anime", "-1"));
   options(
     "palette",
-    next.palettes.map((p, i) => ({ value: String(i), label: p.file.name })),
+    next.palettes.map((p, i) => ({
+      value: String(i),
+      label: p.path.replace(/^assets\/bin\//i, ""),
+    })),
   );
   previewReady ??= preview.init(el("canvas"));
   await previewReady;

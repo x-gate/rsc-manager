@@ -1,4 +1,4 @@
-import type { ResourceFile } from "./catalog";
+import { isResourcePath, type ResourceFile } from "./catalog";
 // Local handles are stored, never the game bytes. Permission is requested only on a click.
 export interface DirectoryHandle extends FileSystemDirectoryHandle {
   values(): AsyncIterableIterator<
@@ -29,14 +29,10 @@ export async function scanDirectory(
         if (
           (!path && /^assets$/i.test(entry.name)) ||
           (/^assets$/i.test(path) && /^bin$/i.test(entry.name)) ||
-          (/^assets\/bin$/i.test(path) && /^pal$/i.test(entry.name))
+          /^assets\/bin(?:\/|$)/i.test(path)
         )
           await walk(entry as DirectoryHandle, next);
-      } else if (
-        /^assets\/bin\/((graphic|anime)(?:info)?.*\.bin|pal\/[^/]+\.cgp)$/i.test(
-          next,
-        )
-      ) {
+      } else if (isResourcePath(next)) {
         files.push({
           path: next,
           file: await (entry as FileSystemFileHandle).getFile(),

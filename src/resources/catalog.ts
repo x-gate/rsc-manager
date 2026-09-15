@@ -14,12 +14,15 @@ export interface Catalog {
   palettes: ResourceFile[];
   warnings: string[];
 }
-export function discover(files: ResourceFile[], root: string): Catalog {
-  const relevant = files.filter(({ path }) =>
-    /^assets\/bin\/((graphic|anime)(?:info)?.*\.bin|pal\/[^/]+\.cgp)$/i.test(
-      path,
-    ),
+// Both folder handles and file-list uploads use the same resource boundary.
+export function isResourcePath(path: string) {
+  return (
+    /^assets\/bin\/(?:[^/]+\/)*(?:graphic|anime)[^/]*\.bin$/i.test(path) ||
+    /^assets\/bin\/(?:[^/]+\/)*pal\/[^/]+\.cgp$/i.test(path)
   );
+}
+export function discover(files: ResourceFile[], root: string): Catalog {
+  const relevant = files.filter(({ path }) => isResourcePath(path));
   const paths = new Map<string, ResourceFile>();
   for (const file of relevant) {
     const key = file.path.toLowerCase();
@@ -31,13 +34,14 @@ export function discover(files: ResourceFile[], root: string): Catalog {
     const sets: ResourceSet[] = [];
     for (const entry of relevant) {
       const match = entry.path.match(
-        new RegExp(`^assets/bin/${kind}info(.*)\\.bin$`, "i"),
+        new RegExp(`^(assets/bin/(?:[^/]+/)*)${kind}info([^/]*)\\.bin$`, "i"),
       );
       if (!match) continue;
-      const name = `${kind}${match[1]}`;
-      const data = paths.get(`assets/bin/${name}.bin`.toLowerCase());
+      const basename = `${kind}${match[2]}`;
+      const name = `${match[1].slice("assets/bin/".length)}${basename}`;
+      const data = paths.get(`${match[1]}${basename}.bin`.toLowerCase());
       if (data) sets.push({ name, info: entry, data });
-      else warnings.push(`${entry.path} 缺少配對的 ${name}.bin。`);
+      else warnings.push(`${entry.path} 缺少同目錄的 ${basename}.bin。`);
     }
     return sets.sort((a, b) =>
       a.name.localeCompare(b.name, "en", { numeric: true }),
