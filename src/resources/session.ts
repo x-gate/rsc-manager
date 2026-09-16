@@ -31,6 +31,9 @@ export function readIndex(
         offY: view.getInt32(offset + 16, true),
         width: view.getInt32(offset + 20, true),
         height: view.getInt32(offset + 24, true),
+        gridW: view.getUint8(offset + 28),
+        gridH: view.getUint8(offset + 29),
+        access: view.getUint8(offset + 30),
         mapId: view.getInt32(offset + 36, true),
       });
     else entry.actions = view.getInt16(offset + 8, true);

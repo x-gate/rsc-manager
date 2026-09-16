@@ -228,6 +228,8 @@ async function openEntry(entry: Entry) {
       ? {
           尺寸: `${entry.width} × ${entry.height}`,
           偏移: `${entry.offX}, ${entry.offY}`,
+          "佔位格數（左右 × 上下）": `${entry.gridW} × ${entry.gridH}`,
+          access: String(entry.access),
           "Map ID": String(entry.mapId),
         }
       : { 動作數: String(entry.actions) }),

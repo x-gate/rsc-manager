@@ -10,6 +10,9 @@ export interface Entry {
   height?: number;
   offX?: number;
   offY?: number;
+  gridW?: number;
+  gridH?: number;
+  access?: number;
   mapId?: number;
   actions?: number;
 }

@@ -86,7 +86,9 @@ export function syntheticResources() {
   for (let row = 0; row < 65; row++) {
     const graphic = graphicBytes(24, 32, row % 2 ? 17 : 16);
     if (row === 64) graphic[0] = 0;
-    index.push(graphicInfo(row === 2 ? 1 : row + 1, offset, graphic.length));
+    const info = graphicInfo(row === 2 ? 1 : row + 1, offset, graphic.length);
+    if (row === 0) info.set([2, 3, 129], 28);
+    index.push(info);
     data.push(graphic);
     offset += graphic.length;
   }

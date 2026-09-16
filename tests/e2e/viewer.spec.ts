@@ -60,6 +60,16 @@ test("Graphic browsing, pagination, duplicate rows, palette and source switching
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
   await open(page);
+  const footprint = page
+    .locator("#metadata dt")
+    .filter({ hasText: "佔位格數（左右 × 上下）" });
+  const access = page.locator("#metadata dt").filter({ hasText: /^access$/ });
+  await expect(footprint.locator("xpath=following-sibling::dd[1]")).toHaveText(
+    "2 × 3",
+  );
+  await expect(access.locator("xpath=following-sibling::dd[1]")).toHaveText(
+    "129",
+  );
   await expect(page.locator("#entries button")).toHaveCount(60);
   await page.getByRole("button", { name: "下一頁", exact: true }).click();
   await expect(page.locator("#entries button")).toHaveCount(5);
@@ -72,6 +82,12 @@ test("Graphic browsing, pagination, duplicate rows, palette and source switching
   await page.locator("#entries button").click();
   await expect(page.locator("#error")).toBeHidden();
   await expect(page.locator("#metadata")).toContainText("1001");
+  await expect(footprint.locator("xpath=following-sibling::dd[1]")).toHaveText(
+    "0 × 0",
+  );
+  await expect(access.locator("xpath=following-sibling::dd[1]")).toHaveText(
+    "0",
+  );
   await page.locator("#palette").selectOption("1");
   await expect(page.locator("#loading")).toBeHidden();
   await page.locator("#graphic-source").selectOption("1");
