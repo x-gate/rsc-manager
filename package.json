@@ -16,6 +16,7 @@
     "preview": "vite preview --host 127.0.0.1 --port 8081"
   },
   "dependencies": {
+    "fflate": "^0.8.3",
     "pixi.js": "^8.8.1"
   },
   "devDependencies": {

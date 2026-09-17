@@ -21,14 +21,20 @@ import {
 import type { Decoded, Entry, Kind } from "./resources/protocol";
 import type { Anime, AnimeAction } from "../.generated/xglib/contract";
 import { Preview, type PreviewFrame } from "./viewer/preview";
+import {
+  animeZip,
+  graphicPng,
+  downloadName,
+  saveDownload,
+} from "./resources/download";
 
 document.querySelector<HTMLDivElement>("#app")!.innerHTML = `
 <header class="topbar"><div class="brand"><span class="mark" aria-hidden="true">▧</span><div><h1>資源檢視器</h1><small>x-gate / Resource explorer</small></div></div><div class="top-actions"><span class="local"><span class="dot"></span>僅在本機處理</span><button id="change" hidden>更換資料夾</button><button id="forget" hidden>忘記資料夾</button></div></header>
 <div id="error" role="alert" hidden></div><div id="loading" class="loadbar" hidden><span id="progress" role="status"></span><button id="cancel">取消載入</button></div>
-<main id="welcome" class="welcome"><span class="eyebrow">YOUR LOCAL RESOURCE LIBRARY</span><h2>每一張圖像，<br>每一格動作。</h2><p>開啟你的遊戲資料夾，在瀏覽器中探索 Graphic 與 Anime。<br>從靜態像素到完整動畫，讓資源細節一目瞭然。</p><section class="connect-card"><div><h3>連接本機遊戲資源</h3><p>請選擇包含 <code>Assets</code> 的遊戲根目錄。<br>檔案僅供唯讀檢視，不會上傳或修改。</p><div class="button-row"><button id="pick" class="primary">選擇遊戲資料夾 ↗</button><button id="fallback">相容模式選取資料夾</button><button id="resume" hidden></button></div></div><div class="folder-icon" aria-hidden="true">▦</div></section><section class="features"><div><span class="eyebrow">01 / GRAPHIC</span><h3>看見像素細節</h3><p>搜尋圖像 ID、切換資源檔與調色盤，檢視尺寸、偏移和索引。</p></div><div><span class="eyebrow">02 / ANIME</span><h3>拆解每一格動作</h3><p>選擇動作與方向，播放、暫停或逐格檢查圖像與原始欄位。</p></div><div><span class="eyebrow">03 / LOCAL FIRST</span><h3>資源留在你的電腦</h3><p>使用 xglib WASM 在瀏覽器內解析，不需要帳號或後端服務。</p></div></section><p class="note">非官方研究工具，未由 Square Enix 授權或背書。遊戲名稱及商標屬各權利人。<br>請使用你有權使用的本機資料；本工具不提供遊戲素材。</p></main>
+<main id="welcome" class="welcome"><span class="eyebrow">YOUR LOCAL RESOURCE LIBRARY</span><h2>每一張圖像，<br>每一格動作。</h2><p>開啟你的遊戲資料夾，在瀏覽器中探索 Graphic 與 Anime。<br>從靜態像素到完整動畫，讓資源細節一目瞭然。</p><section class="connect-card"><div><h3>連接本機遊戲資源</h3><p>請選擇包含 <code>Assets</code> 的遊戲根目錄。<br>檔案以唯讀方式開啟，可下載 PNG；不會上傳或修改來源。</p><div class="button-row"><button id="pick" class="primary">選擇遊戲資料夾 ↗</button><button id="fallback">相容模式選取資料夾</button><button id="resume" hidden></button></div></div><div class="folder-icon" aria-hidden="true">▦</div></section><section class="features"><div><span class="eyebrow">01 / GRAPHIC</span><h3>看見像素細節</h3><p>搜尋圖像 ID、切換資源檔與調色盤，檢視尺寸、偏移和索引。</p></div><div><span class="eyebrow">02 / ANIME</span><h3>拆解每一格動作</h3><p>選擇動作與方向，播放、暫停或逐格檢查圖像與原始欄位。</p></div><div><span class="eyebrow">03 / LOCAL FIRST</span><h3>資源留在你的電腦</h3><p>使用 xglib WASM 在瀏覽器內解析，不需要帳號或後端服務。</p></div></section><p class="note">非官方研究工具，未由 Square Enix 授權或背書。遊戲名稱及商標屬各權利人。<br>請使用你有權使用的本機資料；本工具不提供遊戲素材。</p></main>
 <main id="workspace" class="workspace" hidden><aside class="sidebar"><div class="list-heading"><span class="section-label">RESOURCE LIBRARY</span><small id="root-name"></small></div><div class="source-fields"><label>Graphic 資源檔<select id="graphic-source"></select></label><label>Anime 資源檔<select id="anime-source"></select></label><label>調色盤<select id="palette"></select></label><label>動畫隱藏調色盤<select id="palette-source"></select></label></div><button id="reload" hidden>重新載入資源</button><div class="tabs" role="tablist" aria-label="資源類型"><button id="graphic-tab" role="tab" aria-selected="true">Graphic</button><button id="anime-tab" role="tab" aria-selected="false">Anime</button></div><input id="search" class="search" type="search" placeholder="搜尋 ID 或 #索引列…" aria-label="搜尋資源 ID 或索引列"><div class="list-heading"><span class="section-label">索引列表</span><small id="count">—</small></div><div id="entries" class="resource-list" aria-label="資源列表"></div><div class="pager"><button id="prev" aria-label="上一頁">←</button><span id="page">—</span><button id="next" aria-label="下一頁">→</button></div></aside>
 <section class="stage-area"><div class="stage-toolbar"><div class="stage-title"><span id="kind" class="tag">GRAPHIC</span><h2 id="selected-title">選擇一筆資源</h2></div><div class="tools"><button id="background" aria-label="切換預覽背景">◐</button><button id="zoom" title="回到 100%">100%</button><button id="fit">適合視窗</button></div></div><div class="canvas-wrap"><div id="canvas"></div><span class="canvas-caption">PIXEL PREVIEW / READ ONLY</span><div id="empty" class="empty-preview">從左側選擇資源以開始預覽</div></div><div id="playback" class="playback" hidden><input id="timeline" type="range" min="0" max="0" value="0" aria-label="動畫影格"><div class="button-row"><button id="back-frame" aria-label="上一格">◀</button><button id="play">播放</button><button id="next-frame" aria-label="下一格">▶</button><span id="frame-info"></span></div></div><div class="stage-foot"><span>拖曳平移 · 滾輪縮放 · 0 適合視窗</span><span>NEAREST PIXEL</span></div></section>
-<aside class="inspector"><span class="section-label">INSPECTOR</span><h2>資源資訊</h2><dl id="metadata"><dt>狀態</dt><dd>尚未選取</dd></dl><div id="animation-controls" class="controls" hidden><label>動作 / 方向<select id="action"></select></label><label>播放時序<select id="timing"><option value="duration">CGTool 時序（毫秒）</option><option value="fps">固定 10 FPS</option></select></label><label>速度<select id="speed"><option value="0.5">0.5×</option><option value="1" selected>1×</option><option value="2">2×</option></select></label><p class="note">依 Graphic 偏移定位，套用水平／垂直鏡射。Frame 偏移保留供檢視；事件只顯示，不播放音效。</p></div><p id="source-note"></p><p id="warnings" class="warnings"></p></aside></main>
+<aside class="inspector"><span class="section-label">INSPECTOR</span><h2>資源資訊</h2><dl id="metadata"><dt>狀態</dt><dd>尚未選取</dd></dl><div id="animation-controls" class="controls" hidden><label>動作 / 方向<select id="action"></select></label><label>播放時序<select id="timing"><option value="duration">CGTool 時序（毫秒）</option><option value="fps">固定 10 FPS</option></select></label><label>速度<select id="speed"><option value="0.5">0.5×</option><option value="1" selected>1×</option><option value="2">2×</option></select></label><p class="note">依 Graphic 偏移定位，套用水平／垂直鏡射。Frame 偏移保留供檢視；事件只顯示，不播放音效。</p></div><div class="controls"><button id="download" disabled>下載 PNG</button><button id="download-cancel" hidden>取消下載</button><p id="download-status" class="note" role="status"></p></div><p id="source-note"></p><p id="warnings" class="warnings"></p></aside></main>
 <footer class="statusbar"><span id="status" role="status">等待選擇遊戲資料夾</span><span>xglib WASM · PixiJS</span></footer><input id="directory-input" type="file" webkitdirectory multiple hidden>
 `;
 const el = <T extends HTMLElement = HTMLElement>(id: string) =>
@@ -63,6 +69,7 @@ let selected: Entry | undefined,
   anime: Anime | undefined,
   frames: PreviewFrame[] = [];
 let ready = false;
+let downloadController: AbortController | undefined;
 
 const preview = new Preview();
 let previewReady: Promise<void> | undefined;
@@ -85,6 +92,9 @@ function metadata(values: Record<string, string | number>) {
   );
 }
 function resetPreview() {
+  cancelDownload();
+  button("download").disabled = true;
+  text("download-status", "");
   selection++;
   preview.clear();
   frames = [];
@@ -248,6 +258,7 @@ async function openEntry(entry: Entry) {
         [...(catalog?.warnings ?? []), ...(image.warnings ?? [])].join("\n"),
       );
       busy();
+      updateDownload();
     } else if (result.kind === "anime") {
       anime = result.value;
 
@@ -286,6 +297,9 @@ function interval() {
 async function openAction() {
   const action = anime?.actions[Number(select("action").value)];
   if (!action || !client) return;
+  cancelDownload();
+  button("download").disabled = true;
+  text("download-status", "");
   const job = ++selection,
     active = client;
   preview.clear();
@@ -353,6 +367,7 @@ async function openAction() {
     text("play", "播放");
     busy();
     if (!frames.length) text("empty", "這個動作沒有影格。");
+    updateDownload();
   } catch (e) {
     if (job === selection && active === client) {
       busy();
@@ -401,6 +416,89 @@ preview.onFrame = (index) => {
     });
 };
 preview.onZoom = (zoom) => text("zoom", `${Math.round(zoom * 100)}%`);
+function updateDownload() {
+  text(
+    "download",
+    type === "graphic" ? "下載 PNG" : "下載目前動作 PNG 圖片集（ZIP）",
+  );
+  const incomplete = !frames.length || frames.some((frame) => !frame.image);
+  button("download").disabled =
+    !ready || !selected || incomplete || !!downloadController;
+  button("download").title = incomplete
+    ? "請先載入可完整解碼的圖像或動作。"
+    : "";
+}
+function cancelDownload() {
+  downloadController?.abort();
+  downloadController = undefined;
+  el("download-cancel").hidden = true;
+}
+button("download-cancel").onclick = () => {
+  cancelDownload();
+  text("download-status", "下載已取消。");
+  updateDownload();
+};
+button("download").onclick = async () => {
+  if (button("download").disabled || !catalog || !selected) return;
+  const controller = new AbortController();
+  downloadController = controller;
+  updateDownload();
+  el("download-cancel").hidden = false;
+  text("download-status", "正在準備下載…");
+  const graphic = catalog.graphics[Number(select("graphic-source").value)];
+  const source =
+    type === "graphic"
+      ? graphic
+      : catalog.animes[Number(select("anime-source").value)];
+  const name = downloadName(source.name, selected.id, selected.row);
+  try {
+    let blob: Blob, filename: string;
+    if (type === "graphic") {
+      blob = await graphicPng(frames[0].image!);
+      filename = name + ".png";
+    } else {
+      const actionRow = Number(select("action").value);
+      const action = anime!.actions[actionRow];
+      const hidden = select("palette-source").value;
+      blob = await animeZip(
+        {
+          frames,
+          action,
+          actionRow,
+          id: selected.id,
+          row: selected.row,
+          sources: {
+            graphic: graphic.data.path,
+            anime: source.data.path,
+            palette: catalog.palettes[Number(select("palette").value)].path,
+            hiddenPalette:
+              hidden === "none"
+                ? undefined
+                : hidden === "current"
+                  ? graphic.data.path
+                  : catalog.graphics[Number(hidden)].data.path,
+          },
+        },
+        controller.signal,
+        (done, total) =>
+          text("download-status", `正在產生 PNG：${done} / ${total}`),
+      );
+      filename = `${name}_action_${header(action).action}_direction_${header(action).direct}_row_${actionRow}.zip`;
+    }
+    controller.signal.throwIfAborted();
+    saveDownload(blob, filename);
+    text("download-status", "檔案已準備完成，請查看瀏覽器下載。");
+  } catch (error) {
+    if (!controller.signal.aborted)
+      text("download-status", `下載失敗：${String(error)}`);
+  } finally {
+    if (downloadController === controller) {
+      downloadController = undefined;
+      el("download-cancel").hidden = true;
+      updateDownload();
+    }
+  }
+};
 async function accept(files: ResourceFile[], root: string, job: number) {
   const next = discover(files, root);
   if (job !== directoryJob) return;
